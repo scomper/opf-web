@@ -46,24 +46,40 @@
 | 磁盘 | 10 GB |
 | CPU | 4 核推荐 |
 
-### Windows 安装（推荐）
+### 第一步：下载部署包
+
+从 [GitHub Releases](https://github.com/scomper/opf-web/releases/latest) 下载 `opf-web-deploy.zip`，解压到任意目录。
+
+> ⚠️ 请勿使用 GitHub 页面的 **Code → Download ZIP**，那是源代码，不包含预构建前端。
+
+### 第二步：启动
+
+**Windows**
 
 1. 安装 [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
 2. 启动 Docker Desktop，等待右下角鲸鱼图标变绿
-3. 解压 `opf-web-deploy.zip`
-4. **双击 `deploy.bat`**，按提示操作
+3. 进入解压后的目录，**双击 `deploy.bat`**，按提示操作
 
-### macOS / Linux 安装
+**macOS / Linux**
 
 ```bash
-cd opf-web
+cd opf-web-deploy
 ./deploy.sh
 ```
 
-### 手动安装
+> 脚本会自动下载 OPF 模型（~2.8GB，首次运行时下载，只需一次）。需要能访问 HuggingFace，或提前手动下载到 `~/.opf/privacy_filter/`。
+
+### 第三步：访问
+
+浏览器打开 http://localhost:8081
+
+### 从源码构建（开发者）
 
 ```bash
-# 1. 下载 OPF 模型（~2.8GB，只需一次）
+git clone https://github.com/scomper/opf-web.git
+cd opf-web
+
+# 下载 OPF 模型（~2.8GB，只需一次）
 pip install huggingface_hub
 python3 -c "
 from huggingface_hub import snapshot_download
@@ -72,13 +88,9 @@ model_dir = os.path.expanduser('~/.opf/privacy_filter')
 snapshot_download('openai/privacy_filter', local_dir=model_dir, local_dir_use_symlinks=False)
 "
 
-# 2. 构建启动
+# 构建启动
 docker compose up --build -d
-
-# 3. 访问 http://localhost:8081
 ```
-
-> **部署包自带模型**：`model/` 目录包含完整 OPF 模型文件，deploy.bat 会自动复制到正确位置，无需联网下载。
 
 ---
 

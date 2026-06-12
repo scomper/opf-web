@@ -97,12 +97,20 @@ else
         cp "$SCRIPT_DIR/model/"* "$MODEL_DIR/"
         echo "   ✅ 已复制到 $MODEL_DIR"
     else
-        echo "📥 下载 OPF 模型（~2.8GB）..."
+        echo "📥 首次运行，下载 OPF 模型（~2.8GB，请耐心等待）..."
         pip install -q huggingface_hub 2>/dev/null || pip3 install -q huggingface_hub
         python3 -c "
 from huggingface_hub import snapshot_download
 snapshot_download('openai/privacy_filter', local_dir='$MODEL_DIR', local_dir_use_symlinks=False)
 "
+        if [ $? -ne 0 ]; then
+            echo ""
+            echo "❌ 模型下载失败"
+            echo "   可能原因：网络无法访问 HuggingFace"
+            echo "   解决：手动下载 model 文件到 $MODEL_DIR/"
+            echo "   参考：https://huggingface.co/openai/privacy_filter"
+            exit 1
+        fi
         echo "   ✅ 下载完成"
     fi
 fi
