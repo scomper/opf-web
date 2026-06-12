@@ -228,7 +228,7 @@ opf-web/
 | [OnnxOCR](https://github.com/jingsongliujing/OnnxOCR) | Apache-2.0 | OCR 文字识别 |
 | [FastAPI](https://fastapi.tiangolo.com) | MIT | Web 后端框架 |
 | [Vue 3](https://vuejs.org) | MIT | 前端框架 |
-| [jieba](https://github.com/fxsjy/jieba) | Apache-2.0 | 中文分词 & NER |
+
 | [pdfplumber](https://github.com/jsvine/pdfplumber) | MIT | PDF 解析 |
 | [openpyxl](https://openpyxl.readthedocs.io) | MIT | Excel 读写 |
 | [python-docx](https://python-docx.readthedocs.io) | MIT | Word 文档处理 |
@@ -247,7 +247,6 @@ opf-web/
 **性能优化**
 - 去重复段落：相同文本只检测 1 次，结果复用（合并单元格多的文件省 30-50%）
 - OPF 真并行：batch 内 ThreadPoolExecutor(8) 并行推理，~7-8x 提速
-- jieba NER 后处理并行化：ThreadPoolExecutor(4)
 - 增量结果流：每个 batch 完成后更新结果，前端可实时看到部分检测结果
 
 **检测增强**
@@ -263,7 +262,10 @@ opf-web/
 - OPF 模型挂载改为直接挂主机目录（不用 named volume）
 - 检测结果缓存版本升级
 
-### v1.1.0 (2026-06-11)
+---
+
+<details>
+<summary>v1.1.0 (2026-06-11)</summary>
 
 **检测增强**
 - 新增座机号、400/800 热线正则检测
@@ -306,5 +308,11 @@ opf-web/
 - 部署包自带 OPF 模型（无需联网下载）
 - 新增 `TASK_MAX_AGE_HOURS`、`TASK_MAX_COUNT` 配置项
 
-### v1.0.0 (2026-06-11)
+</details>
+
+<details>
+<summary>v1.0.0 (2026-06-11)</summary>
+
 - 初始发布
+
+</details>
