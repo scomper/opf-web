@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+httpx
+python-multipart
+openpyxl
+python-docx
+pdfplumber
+aiofiles
+reportlab
+jieba
+magika
+onnxocr
+psutil

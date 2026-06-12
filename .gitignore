@@ -1,0 +1,28 @@
+# Dependencies
+frontend/node_modules/
+frontend/dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Docker
+.opf/
+
+# Runtime
+whitelist/scan_cache.json
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Env
+.env
+test_sample.txt
+whitelist/tasks.db

@@ -1,0 +1,27 @@
+FROM python:3.12-slim
+
+# Disable proxy for build stage
+ENV HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= ALL_PROXY= NO_PROXY="*"
+
+# Install git for pip install from GitHub
+RUN apt-get update && apt-get install -y --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install CPU-only PyTorch first (much smaller, no CUDA)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install OPF from official OpenAI repo (torch already satisfied)
+RUN pip install --no-cache-dir "git+https://github.com/openai/privacy-filter.git"
+
+# Install server dependencies + Chinese NER
+RUN pip install --no-cache-dir fastapi uvicorn pydantic hanlp
+
+# Copy server.py (thin FastAPI wrapper, same as gh0stkey version but under our control)
+COPY server.py .
+
+EXPOSE 8000
+
+# Model downloads on first start (~1.5B params)
+CMD ["python", "server.py"]
