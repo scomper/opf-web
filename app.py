@@ -51,7 +51,7 @@ logger = logging.getLogger("opf-web")
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
-app = FastAPI(title="OPF Privacy Filter Web", version="1.1.1")
+app = FastAPI(title="OPF Privacy Filter Web", version="1.2.1")
 
 # CORS: allow all origins for local Docker use.
 # For production, set CORS_ORIGINS to restrict (e.g., "https://example.com").
@@ -807,7 +807,7 @@ def get_ocr():
             return None
         try:
             from onnxocr.onnx_paddleocr import ONNXPaddleOcr
-            _ocr_instance = ONNXPaddleOcr(use_angle_cls=False, use_gpu=False)
+            _ocr_instance = ONNXPaddleOcr(use_angle_cls=False, use_gpu=False, det_limit_side_len=640)
             logger.info("OnnxOCR initialized successfully")
         except Exception as e:
             logger.error("Failed to initialize OnnxOCR: %s", e)

@@ -2,7 +2,7 @@
 
 > 基于 [OpenAI Privacy Filter](https://github.com/openai/privacy-filter) 的文档隐私信息自动检测与脱敏系统。
 
-**版本**：v1.2.0  
+**版本**：v1.2.1  
 **作者**：scomper  
 **许可**：[MIT](LICENSE)
 
@@ -253,6 +253,13 @@ opf-web/
 ---
 
 ## 更新日志
+
+### v1.2.1 (2026-06-17)
+
+**性能优化**
+- OnnxOCR `det_limit_side_len` 从默认 960 降为 640，OCR 提速约 23%，精度无损
+
+---
 
 ### v1.2.0 (2026-06-12)
 
