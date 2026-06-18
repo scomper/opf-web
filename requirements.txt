@@ -6,7 +6,6 @@ python-docx
 pdfplumber
 aiofiles
 reportlab
-jieba
 magika
 onnxocr
 psutil

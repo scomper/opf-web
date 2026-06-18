@@ -18,6 +18,9 @@ whitelist/scan_cache.json
 .DS_Store
 Thumbs.db
 
+# Internal
+.claude/
+
 # IDE
 .vscode/
 .idea/

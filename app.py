@@ -770,11 +770,6 @@ def _luhn_check(num: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Chinese NER via jieba POS tagging (offline, no network required)
-# ---------------------------------------------------------------------------
-import jieba.posseg as pseg
-
-# ---------------------------------------------------------------------------
 # OnnxOCR for scanned PDFs and image files (lazy init, optional)
 # Lightweight PP-OCRv5 ONNX-based OCR, ~126MB vs PaddleOCR's ~581MB
 # ---------------------------------------------------------------------------
@@ -839,140 +834,6 @@ def ocr_extract_text(image_path: str) -> str:
     return '\n'.join(texts)
 
 
-def detect_chinese_ner(text: str) -> list[dict]:
-    """Detect Chinese person names, organizations, locations via jieba POS.
-    Returns list of {label, start, end, text}.
-
-    POS tags:
-      nr = person name
-      ns = place name
-      nt = organization name
-      nrt = foreign person name
-    """
-    spans = []
-    # Pre-clean: strip mid-word spaces (DOCX tables often insert "故 障 基 本 信 息")
-    # but keep original text for position mapping
-    clean_text = text.replace(' ', '') if text.count(' ') > len(text) * 0.15 else text
-    use_clean = clean_text != text
-
-    # jieba.posseg.cut returns (word, flag) pairs
-    remaining = clean_text if use_clean else text
-    pos = 0
-
-    for word, flag in pseg.cut(remaining):
-        # Find the word's position in the remaining text
-        idx = remaining.find(word)
-        if idx < 0:
-            pos += len(word)
-            remaining = remaining[len(word):]
-            continue
-
-        abs_start = pos + idx
-        abs_end = abs_start + len(word)
-
-        # Map POS tags to OPF-compatible labels
-        label_map = {
-            'nr': 'private_person',    # 人名
-            'nrt': 'private_person',   # 音译人名
-            'nt': 'organization',      # 机构团体名
-        }
-        mapped_label = label_map.get(flag)
-
-        if mapped_label and len(word) >= 2:
-            # Skip common non-person words that jieba mis-tags as nr/nt
-            skip_words = {
-                '有限', '公司', '技术', '大学', '中学', '高中', '学院', '信息',
-                '平台', '系统', '模块', '服务', '网络', '安全', '中心', '管理',
-                '监控', '故障', '告警', '日志', '配置', '控制', '引擎', '网关',
-                '代理', '缓存', '队列', '接口', '协议', '标准', '规范', '节点',
-                '集群', '容器', '数据库', '中间件', '备份', '存储', '服务器',
-                '卡死', '宕机', '异常', '处理', '情况', '原因', '影响', '范围',
-                '部门', '人员', '电话', '备注', '日期', '时间', '编号', '序号',
-                '合计', '总计', '默认', '测试', '生产', '开发', '运维', '资源',
-                '成本', '费用', '账单', '发票', '合同', '项目', '任务', '业务',
-                '产品', '客户', '供应商', '采购', '销售', '财务', '行政', '人事',
-                '文档', '报告', '方案', '计划', '总结', '记录', '通知', '公告',
-            }
-            if word in skip_words:
-                continue
-
-            # Skip if word contains spaces (artifact from DOCX table formatting)
-            if ' ' in word or '  ' in word:
-                continue
-
-            # Skip single-char words that are likely just fragments
-            if len(word) <= 2 and mapped_label == 'private_person':
-                # 2-char person names must start with a common Chinese surname
-                _SURNAMES = set('赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜戚谢邹喻柏水窦章云苏潘葛奚范彭郎鲁韦昌马苗凤花方俞任袁柳酆鲍史唐费廉岑薛雷贺倪汤滕殷罗毕郝邬安常乐于时傅皮齐康伍余元卜顾孟平黄和穆萧尹姚邵湛汪祁毛禹狄米贝明臧计伏成戴谈宋茅庞熊纪舒屈项祝董梁杜阮蓝闵席季麻强贾路娄危江童颜郭梅盛林刁钟徐邱骆高夏蔡田樊胡凌霍虞万支柯昝管卢莫经房裘缪干解应宗丁宣贲邓郁单杭洪包诸左石崔吉钮龚程嵇邢滑裴陆荣翁荀羊於惠甄曲家封芮羿储靳汲邴糜松井段富巫乌焦巴弓牧隗山谷车侯宓蓬全郗班仰秋仲伊宫宁仇栾暴甘钭厉戎祖武符刘景詹束龙叶幸司韶郜黎蓟薄印宿白怀蒲邰从鄂索咸籍赖卓蔺屠蒙池乔阴郁胥能苍双闻莘党翟谭贡劳逄姬申扶堵冉宰郦雍却璩桑桂濮牛寿通边扈燕冀郏浦尚农温别庄晏柴瞿阎充慕连茹习宦艾鱼容向古易慎戈廖庾终暨居衡步都耿满弘匡国文寇广禄阙东欧')
-                if word[0] not in _SURNAMES:
-                    continue
-
-            spans.append({
-                "label": mapped_label,
-                "start": abs_start,
-                "end": abs_end,
-                "text": word,
-            })
-
-        # Advance position
-        pos += idx + len(word)
-        remaining = remaining[idx + len(word):]
-
-    # Post-process: merge adjacent entity spans of the same type
-    # e.g., "北京" (ns) + "瑞星" (nr) + "信息技术有限公司" (nt) → merge as org
-    merged = _merge_adjacent_org_spans(text, spans)
-    return merged
-
-
-def _merge_adjacent_org_spans(text: str, spans: list[dict]) -> list[dict]:
-    """Merge adjacent organization-related spans into a single org span.
-    Pattern: [ns][nr or n][nt] → organization
-    """
-    if len(spans) < 2:
-        return spans
-
-    result = []
-    i = 0
-    while i < len(spans):
-        current = spans[i]
-        # Look ahead for adjacent spans that form an organization name
-        j = i + 1
-        while j < len(spans):
-            next_span = spans[j]
-            # Check if spans are adjacent (or nearly adjacent, within 3 chars gap)
-            gap = next_span["start"] - current["end"]
-            if gap <= 3:
-                # Check if the gap text is just org suffixes or punctuation
-                gap_text = text[current["end"]:next_span["start"]]
-                if all(c in '有限公术技信限责股份集一二三四五六七八九十' for c in gap_text) or gap == 0:
-                    # Merge: extend current span to include next
-                    merged_text = text[current["start"]:next_span["end"]]
-                    # If we have a location + company pattern, mark as org
-                    if (current["label"] == "private_address" and next_span["label"] in ("organization", "private_person")):
-                        current = {
-                            "label": "organization",
-                            "start": current["start"],
-                            "end": next_span["end"],
-                            "text": merged_text,
-                        }
-                        j += 1
-                        continue
-                    elif current["label"] == next_span["label"]:
-                        current = {
-                            "label": current["label"],
-                            "start": current["start"],
-                            "end": next_span["end"],
-                            "text": merged_text,
-                        }
-                        j += 1
-                        continue
-            break
-        result.append(current)
-        i = j
-
-    return result
-
-
 def merge_pii_spans(opf_spans: list[dict], ner_spans: list[dict]) -> list[dict]:
     """Merge OPF and HanLP spans, deduplicate overlaps (OPF takes priority)."""
     if not ner_spans:
@@ -1034,9 +895,7 @@ async def detect_pii_batch(texts: list[str]) -> list[dict]:
 def _post_process_spans(text: str, opf_spans: list[dict]) -> list[dict]:
     """Merge OPF spans with dict + builtin, then filter false positives.
 
-    Note: jieba NER (detect_chinese_ner) disabled — tested 2026-06-12,
-    it missed all real PII and false-positived on technical terms.
-    OPF model + regex engine covers all detection needs.
+    Note: OPF model + regex engine covers all detection needs.
     """
     dict_spans = match_dictionary(text)
     builtin_spans = detect_builtin_patterns(text)
@@ -1399,7 +1258,7 @@ async def process_task(task_id: str, filepath: Path, filename: str, ext: str, *,
                     logger.warning("[%s] Batch %d-%d failed: %s", task_id, batch_start, batch_end, e)
                     batch_opf = [{"detected_spans": []} for _ in batch]
 
-                # Post-process: jieba NER + filtering (parallel via ThreadPool)
+                # Post-process: dict + regex + filtering (parallel via ThreadPool)
                 def _post_one(idx):
                     text = batch[idx]
                     spans_raw = batch_opf[idx].get("detected_spans", [])
@@ -2300,7 +2159,7 @@ async def rescan_task(body: dict):
 
 @app.get("/api/health/services")
 async def health_services():
-    """Check health of downstream services (pf_backend, OCR, jieba)."""
+    """Check health of downstream services (pf_backend, OCR)."""
     services = {}
 
     # OPF / pf_backend (local)
@@ -2316,12 +2175,5 @@ async def health_services():
         services["ocr"] = {"status": "ok"}
     except Exception:
         services["ocr"] = {"status": "unavailable"}
-
-    # jieba
-    try:
-        import jieba  # noqa: F401
-        services["jieba"] = {"status": "ok"}
-    except Exception:
-        services["jieba"] = {"status": "unavailable"}
 
     return services

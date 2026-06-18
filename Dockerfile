@@ -35,7 +35,7 @@ WORKDIR /app
 
 # System deps for OnnxOCR (OpenCV needs libgl1) + CJK fonts
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 libglib2.0-0 fonts-noto-cjk libgomp1 \
+    libgl1 libglib2.0-0 fonts-noto-cjk libgomp1 curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy compiled privacy-filter shared libraries
