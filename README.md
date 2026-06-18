@@ -202,7 +202,7 @@ opf-web:
 ```
 opf-web/
 ├── app.py                    # Web 后端（FastAPI）
-├── server.py                 # OPF 模型服务包装器
+├── server.py                 # OPF API 兼容层（可选独立部署）
 ├── pf_backend.py             # privacy-filter.cpp ctypes 绑定
 ├── requirements.txt          # Python 依赖
 ├── Dockerfile                # 单容器镜像（含编译 + 模型下载）
