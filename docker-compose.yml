@@ -1,15 +1,16 @@
-# Docker Compose for OPF Privacy Filter Web
+# Docker Compose for OPF Privacy Filter Web (single container with pf_backend)
 # Usage: docker compose up --build
 # The app will be available at http://localhost:${WEB_PORT:-8081}
+#
+# Model is baked into the Docker image (no separate download needed)
 
 services:
   opf-web:
     build: .
-    container_name: opf-web-opf-web-1
+    container_name: opf-web
     ports:
       - "${WEB_PORT:-8081}:8080"
     environment:
-      - OPF_URL=http://opf:8000
       - OCR_ENABLED=true
       - HOST_HOME=/host
       - SCAN_HOME=${HOME:-/root}
@@ -17,45 +18,18 @@ services:
       - TASK_MAX_AGE_HOURS=${TASK_MAX_AGE_HOURS:-72}
       - TASK_MAX_COUNT=${TASK_MAX_COUNT:-500}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - PF_MODEL_PATH=/models/privacy-filter-multilingual-f16.gguf
+      - PF_LIB_PATH=/usr/local/lib/pf/libpf.so
     volumes:
       - ./whitelist:/app/whitelist
       - ./app.py:/app/app.py
-      - ./frontend/dist:/app/static  # 前端持久化，不随容器重建丢失
+      - ./pf_backend.py:/app/pf_backend.py
+      - ./frontend/dist:/app/static
       - ${HOME}:/host:ro
-    depends_on:
-      - opf
     deploy:
       resources:
         limits:
-          memory: 3G
+          memory: 4G
         reservations:
-          memory: 512M
+          memory: 1G
     restart: unless-stopped
-
-  opf:
-    build:
-      context: .
-      dockerfile: Dockerfile.opf
-    container_name: opf-web-opf-1
-    volumes:
-      - ${HOME}/.opf/privacy_filter:/root/.opf/privacy_filter:ro
-      - ./server.py:/app/server.py
-    environment:
-      - ALL_PROXY=
-      - HTTP_PROXY=
-      - HTTPS_PROXY=
-      - http_proxy=
-      - https_proxy=
-      - NO_PROXY=*
-      - OPF_DEVICE=cpu
-      - OPF_OUTPUT_MODE=typed
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-        reservations:
-          memory: 2G
-    restart: unless-stopped
-
-volumes:
-  opf-model:

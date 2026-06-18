@@ -70,40 +70,7 @@ if %IS_UPGRADE% equ 1 (
     echo [√] 已停止
 )
 
-:: ─── OPF 模型 ─────────────────────────────────────────
-set MODEL_DIR=%USERPROFILE%\.opf\privacy_filter
-if not exist "%MODEL_DIR%" mkdir "%MODEL_DIR%"
-
-echo.
-if exist "%MODEL_DIR%\model.safetensors" (
-    echo [√] OPF 模型已存在
-) else if exist "model\model.safetensors" (
-    echo [..] 复制 OPF 模型...
-    copy "model\*" "%MODEL_DIR%\" >nul 2>&1
-    echo [√] 已复制
-) else (
-    echo [..] 首次运行，下载 OPF 模型（~2.8GB，请耐心等待）...
-    pip install -q huggingface_hub 2>nul || pip3 install -q huggingface_hub 2>nul
-    if %errorlevel% neq 0 (
-        echo [错误] pip 未找到，请先安装 Python 3.8+
-        echo   https://www.python.org/downloads/
-        pause
-        exit /b 1
-    )
-    python -c "from huggingface_hub import snapshot_download; snapshot_download('openai/privacy_filter', local_dir=r'%MODEL_DIR%', local_dir_use_symlinks=False)"
-    if %errorlevel% neq 0 (
-        echo.
-        echo [错误] 模型下载失败
-        echo   可能原因：网络无法访问 HuggingFace
-        echo   解决：手动下载 model 文件到 %MODEL_DIR%\
-        echo   参考：https://huggingface.co/openai/privacy_filter
-        pause
-        exit /b 1
-    )
-    echo [√] 模型下载完成
-)
-
-:: ─── 构建启动 ─────────────────────────────────────────
+:: ─── 构建启动（模型已内置在镜像中）──────────────────────
 echo.
 if %IS_UPGRADE% equ 1 (
     echo [..] 重建容器并启动...
@@ -115,7 +82,7 @@ docker compose up --build -d
 if %errorlevel% neq 0 (
     echo.
     echo [错误] 构建失败
-    echo   常见原因：Docker Desktop 内存不足（需 12GB+）
+    echo   常见原因：Docker Desktop 内存不足（需 6GB+）
     pause
     exit /b 1
 )

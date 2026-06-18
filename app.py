@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Optional
 
 import csv
-import httpx
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -25,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-OPF_URL = os.getenv("OPF_URL", "http://localhost:8000")
+# OPF_URL removed — detection now uses pf_backend locally
 UPLOAD_DIR = Path(tempfile.gettempdir()) / "opf-uploads"
 WHITELIST_PATH = Path(os.getenv("WHITELIST_PATH", str(Path(__file__).parent / "whitelist")))
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
@@ -998,16 +997,38 @@ def merge_pii_spans(opf_spans: list[dict], ner_spans: list[dict]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# PII detection via OPF API
+# PII detection via pf_backend (privacy-filter.cpp)
 # ---------------------------------------------------------------------------
 
+# Lazy singleton — initialised on first call so imports don't require the model
+_pf_instance = None
+
+def _get_pf():
+    global _pf_instance
+    if _pf_instance is None:
+        from pf_backend import PFBackend
+        _pf_instance = PFBackend.get()
+    return _pf_instance
+
+
 async def detect_pii_batch(texts: list[str]) -> list[dict]:
-    """Call OPF batch endpoint for multiple texts at once."""
-    async with httpx.AsyncClient(timeout=300) as client:
-        resp = await client.post(f"{OPF_URL}/redact/batch", json={"texts": texts})
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("results", [])
+    """Detect PII in a batch of texts using pf_backend (local ctypes call).
+
+    Returns a list of dicts with "detected_spans" key to match the old
+    OPF /redact/batch response format consumed by the caller.
+    """
+    pf = _get_pf()
+    loop = asyncio.get_running_loop()
+
+    def _classify_one(text: str) -> dict:
+        spans = pf.classify(text, threshold=0.5)
+        return {"detected_spans": spans}
+
+    # Run blocking classify calls in a thread pool
+    results = await asyncio.gather(
+        *[loop.run_in_executor(None, _classify_one, t) for t in texts]
+    )
+    return list(results)
 
 
 def _post_process_spans(text: str, opf_spans: list[dict]) -> list[dict]:
@@ -1028,6 +1049,7 @@ def _post_process_spans(text: str, opf_spans: list[dict]) -> list[dict]:
     _space_sensitive_labels = {
         'private_phone', 'PHONE', 'PRIVATE_PHONE',
         'private_idcard', 'IDCARD', 'PRIVATE_IDCARD',
+        'account_number',  # pf_backend: ID card / SSN / account numbers
         'private_bankcard', 'BANK', 'PRIVATE_BANKCARD',
         'secret', 'SECRET',
     }
@@ -1058,7 +1080,9 @@ def _is_false_positive(detected_text: str, label: str) -> bool:
         'private_phone', 'PHONE', 'PRIVATE_PHONE',
         'private_email', 'EMAIL', 'PRIVATE_EMAIL',
         'private_idcard', 'IDCARD', 'PRIVATE_IDCARD',
+        'account_number',  # pf_backend: ID card / SSN / account numbers
         'private_bankcard', 'BANK', 'PRIVATE_BANKCARD',
+        'secret', 'SECRET',
     }
     if label in real_pii_labels:
         # Phone-specific validation: OPF sometimes over-detects short numbers as phone
@@ -2276,14 +2300,13 @@ async def rescan_task(body: dict):
 
 @app.get("/api/health/services")
 async def health_services():
-    """Check health of downstream services (OPF, OCR, jieba)."""
+    """Check health of downstream services (pf_backend, OCR, jieba)."""
     services = {}
 
-    # OPF
+    # OPF / pf_backend (local)
     try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.get(f"{OPF_URL}/health")
-            services["opf"] = {"status": "ok" if resp.status_code == 200 else "error"}
+        pf = _get_pf()
+        services["opf"] = {"status": "ok" if pf and pf.loaded else "error"}
     except Exception:
         services["opf"] = {"status": "error"}
 

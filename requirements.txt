@@ -1,6 +1,5 @@
 fastapi
 uvicorn[standard]
-httpx
 python-multipart
 openpyxl
 python-docx

@@ -30,8 +30,8 @@ echo "✅ Docker $(docker version --format '{{.Server.Version}}' 2>/dev/null)"
 
 TOTAL_MEM=$(docker system info --format '{{.MemTotal}}' 2>/dev/null || echo 0)
 TOTAL_MEM_GB=$((TOTAL_MEM / 1073741824))
-if [ "$TOTAL_MEM_GB" -lt 12 ]; then
-    echo "⚠️  内存 ${TOTAL_MEM_GB}GB，建议 16GB+（Docker Desktop → Settings → Resources）"
+if [ "$TOTAL_MEM_GB" -lt 6 ]; then
+    echo "⚠️  内存 ${TOTAL_MEM_GB}GB，建议 8GB+（Docker Desktop → Settings → Resources）"
     read -p "   继续？(y/N) " -n 1 -r; echo
     [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
 else
@@ -85,37 +85,7 @@ if [ "$IS_UPGRADE" = true ]; then
     echo "   ✅ 已停止"
 fi
 
-# ─── 检查 OPF 模型 ────────────────────────────────────────────────
-MODEL_DIR="$HOME/.opf/privacy_filter"
-echo ""
-if [ -f "$MODEL_DIR/model.safetensors" ]; then
-    echo "✅ OPF 模型已存在"
-else
-    if [ -f "$SCRIPT_DIR/model/model.safetensors" ]; then
-        echo "📥 从部署包复制 OPF 模型..."
-        mkdir -p "$MODEL_DIR"
-        cp "$SCRIPT_DIR/model/"* "$MODEL_DIR/"
-        echo "   ✅ 已复制到 $MODEL_DIR"
-    else
-        echo "📥 首次运行，下载 OPF 模型（~2.8GB，请耐心等待）..."
-        pip install -q huggingface_hub 2>/dev/null || pip3 install -q huggingface_hub
-        python3 -c "
-from huggingface_hub import snapshot_download
-snapshot_download('openai/privacy_filter', local_dir='$MODEL_DIR', local_dir_use_symlinks=False)
-"
-        if [ $? -ne 0 ]; then
-            echo ""
-            echo "❌ 模型下载失败"
-            echo "   可能原因：网络无法访问 HuggingFace"
-            echo "   解决：手动下载 model 文件到 $MODEL_DIR/"
-            echo "   参考：https://huggingface.co/openai/privacy_filter"
-            exit 1
-        fi
-        echo "   ✅ 下载完成"
-    fi
-fi
-
-# ─── 构建并启动 ────────────────────────────────────────────────────
+# ─── 构建并启动（模型已内置在镜像中）────────────────────────────────
 echo ""
 if [ "$IS_UPGRADE" = true ]; then
     echo "🔨 重建容器并启动..."

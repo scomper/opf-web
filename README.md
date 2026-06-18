@@ -1,8 +1,8 @@
 # OPF 隐私信息检测平台
 
-> 基于 [OpenAI Privacy Filter](https://github.com/openai/privacy-filter) 的文档隐私信息自动检测与脱敏系统。
+> 基于 [privacy-filter.cpp](https://github.com/localai-org/privacy-filter.cpp) 的文档隐私信息自动检测与脱敏系统。
 
-**版本**：v1.2.1  
+**版本**：v2.0.0  
 **作者**：scomper  
 **许可**：[MIT](LICENSE)
 
@@ -24,13 +24,14 @@
 ## 架构
 
 ```
-┌─────────────┐     ┌──────────────────┐     ┌─────────────┐
-│  浏览器 :8081│────→│  OPF Web         │────→│  OPF 模型    │
-│  Vue 3 SPA  │     │  FastAPI         │     │  :8000       │
-└─────────────┘     │  + 正则引擎       │     │  ~6GB 内存   │
-                    │  + OnnxOCR       │     └─────────────┘
-                    │  ~300MB 内存      │
-                    └──────────────────┘
+┌─────────────┐     ┌──────────────────────────┐
+│  浏览器 :8081│────→│  OPF Web (单容器)          │
+│  Vue 3 SPA  │     │  FastAPI + pf_backend     │
+└─────────────┘     │  + 正则引擎                │
+                    │  + OnnxOCR                │
+                    │  + privacy-filter.cpp      │
+                    │  ~2.8GB 内存               │
+                    └──────────────────────────┘
 ```
 
 ---
@@ -42,8 +43,8 @@
 | 项目 | 最低要求 |
 |------|---------|
 | Docker Desktop | 最新版（自带 Compose） |
-| 内存 | 16 GB（Docker 分配 12GB+） |
-| 磁盘 | 10 GB |
+| 内存 | 8 GB（Docker 分配 6GB+） |
+| 磁盘 | 5 GB |
 | CPU | 4 核推荐 |
 
 ### 第一步：下载部署包
@@ -67,7 +68,7 @@ cd opf-web-deploy
 ./deploy.sh
 ```
 
-> 脚本会自动下载 OPF 模型（~2.8GB，首次运行时下载，只需一次）。需要能访问 HuggingFace，或提前手动下载到 `~/.opf/privacy_filter/`。
+> 模型已内置在 Docker 镜像中，无需单独下载。首次构建约 5-10 分钟。
 
 ### 第三步：访问
 
@@ -79,16 +80,7 @@ cd opf-web-deploy
 git clone https://github.com/scomper/opf-web.git
 cd opf-web
 
-# 下载 OPF 模型（~2.8GB，只需一次）
-pip install huggingface_hub
-python3 -c "
-from huggingface_hub import snapshot_download
-import os
-model_dir = os.path.expanduser('~/.opf/privacy_filter')
-snapshot_download('openai/privacy_filter', local_dir=model_dir, local_dir_use_symlinks=False)
-"
-
-# 构建启动
+# 构建启动（模型自动下载并打包进镜像）
 docker compose up --build -d
 ```
 
@@ -112,7 +104,7 @@ docker compose up --build -d
 
 ### OPF 模型检测（主引擎）
 - 姓名、手机号、邮箱、地址、日期、URL、密码/密钥、账号/证件号、银行卡号、身份证号
-- 基于 OpenAI Privacy Filter（~1.5B 参数 Transformer 模型）
+- 基于 privacy-filter.cpp（GGUF 量化模型，~1.5B 参数，C++ 推理引擎）
 
 ### 正则引擎检测（补充覆盖）
 
@@ -187,7 +179,6 @@ docker compose up --build -d
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `WEB_PORT` | `8081` | Web 服务端口 |
-| `OPF_URL` | `http://opf:8000` | OPF 模型地址 |
 | `OPF_CONCURRENCY` | `10` | OPF 并发检测数 |
 | `MAX_TASK_CONCURRENCY` | `3` | 最大并行文件处理数 |
 | `OCR_ENABLED` | `true` | 是否启用 OCR |
@@ -201,13 +192,7 @@ opf-web:
   deploy:
     resources:
       limits:
-        memory: 3G    # Web 服务（含 OnnxOCR）
-
-opf:
-  deploy:
-    resources:
-      limits:
-        memory: 8G    # OPF 模型（加载后 ~6GB）
+        memory: 4G    # Web 服务 + pf_backend + OnnxOCR
 ```
 
 ---
@@ -218,15 +203,14 @@ opf:
 opf-web/
 ├── app.py                    # Web 后端（FastAPI）
 ├── server.py                 # OPF 模型服务包装器
+├── pf_backend.py             # privacy-filter.cpp ctypes 绑定
 ├── requirements.txt          # Python 依赖
-├── Dockerfile                # Web 容器镜像
-├── Dockerfile.opf            # OPF 模型容器镜像
+├── Dockerfile                # 单容器镜像（含编译 + 模型下载）
 ├── docker-compose.yml        # 编排配置
 ├── deploy.sh                 # macOS/Linux 一键部署
 ├── deploy.bat                # Windows 一键部署
 ├── .env.example              # 环境变量模板
 ├── whitelist/                # 白名单 + 敏感词库 + 缓存
-├── model/                    # OPF 模型文件（部署包内）
 └── frontend/                 # Vue 3 前端
 ```
 
@@ -236,6 +220,7 @@ opf-web/
 
 | 项目 | 许可 | 用途 |
 |------|------|------|
+| [privacy-filter.cpp](https://github.com/localai-org/privacy-filter.cpp) | MIT | C++ 推理引擎 |
 | [OpenAI Privacy Filter](https://github.com/openai/privacy-filter) | MIT | 主检测模型 |
 | [OnnxOCR](https://github.com/jingsongliujing/OnnxOCR) | Apache-2.0 | OCR 文字识别 |
 | [FastAPI](https://fastapi.tiangolo.com) | MIT | Web 后端框架 |
@@ -253,6 +238,27 @@ opf-web/
 ---
 
 ## 更新日志
+
+### v2.0.0 (2026-06-18)
+
+**架构重构**
+- 单容器架构：移除独立 OPF 模型容器，pf_backend 直接调用 privacy-filter.cpp（ctypes → libpf.so）
+- 内存：11GB → 2.8GB（降低 75%）
+- 推理速度：350ms → 26ms（提升 13×，峰值 87 条/秒）
+- 模型内置：GGUF 模型打包进 Docker 镜像，用户无需单独下载
+
+**技术变更**
+- 新增 pf_backend.py：ctypes 绑定 libpf.so，217 标签→10 类映射，相邻实体合并
+- server.py 重写：PyTorch OPF → pf_backend
+- app.py 适配：detect_pii_batch 改为本地调用，移除 HTTP 依赖
+- Dockerfile：多阶段构建（ubuntu:24.04 编译 + python:3.12-slim 运行）
+- 移除 Dockerfile.opf、httpx 依赖
+
+**检测引擎**
+- 基于 privacy-filter.cpp（C++ GGML 推理，GGUF 量化模型）
+- 支持 131k token 长文档（无 OOM 风险）
+
+---
 
 ### v1.2.1 (2026-06-17)
 
