@@ -8,4 +8,5 @@ aiofiles
 reportlab
 magika
 onnxocr-ppocrv5
+opencv-python-headless
 psutil

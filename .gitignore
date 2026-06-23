@@ -14,6 +14,9 @@ __pycache__/
 whitelist/scan_cache.json
 /tmp/
 
+# Model files (too large for git)
+models/*.gguf
+
 # OS
 .DS_Store
 Thumbs.db
