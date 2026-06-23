@@ -32,3 +32,4 @@ Thumbs.db
 .env
 test_sample.txt
 whitelist/tasks.db
+models/
