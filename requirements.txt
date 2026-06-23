@@ -7,5 +7,5 @@ pdfplumber
 aiofiles
 reportlab
 magika
-onnxocr
+onnxocr-ppocrv5
 psutil
